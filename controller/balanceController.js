@@ -30,7 +30,7 @@ export const createCustomerBalance = async (req, res) => {
 
 export const getCustomerBalance = async (req, res) => {
   try {
-    const startMonth = 9;
+    const startMonth = 11;
     const endMonth = 12;
     const { retailUnitCode, customerId, activity, year } = req.params;
     fs.readFile(filePath, "utf8", (err, data) => {
@@ -38,88 +38,86 @@ export const getCustomerBalance = async (req, res) => {
         console.error("Error reading file:", err);
         return;
       }
-       // -----------------------Calculate monthly closing and opening balance------------------------
 
-      try {
+      // -----------------------Calculate monthly closing and opening balance------------------------
 
-        //To do --Improvement
-        const balanceEvents = JSON.parse(data);
-
-        const openingBalanceForGivenMonthsAndYears =
-          calculateOpeningBalanceForGivenMonthsAndYears(
-            balanceEvents,
-            startMonth,
-            year
-          );
-        console.log(
-          "Closing balance for past months and years:",
-          openingBalanceForGivenMonthsAndYears
-        );
-
-        const filteredEventsByMonth = balanceEvents.filter((event) => {
-          const eventYear = new Date(event.time).getFullYear();
-          const eventMonth = new Date(event.time).getMonth() + 1;
+      //To do --Improvement
+      const allBalanceEvents = JSON.parse(data);
+      const filterEventsByCustIdActivityAndMarket = allBalanceEvents.filter(
+        (event) => {
           return (
             event.market === retailUnitCode &&
             event.customerId === customerId &&
-            event.reason === activity &&
-            eventYear == year &&
-            eventMonth >= startMonth &&
-            eventMonth <= endMonth
+            event.reason === activity
           );
-        });
+        }
+      );
+    
+      const requestYearEventMonthValuePairs = initializeMonthArray();
 
-        // Calculate opening balance
-        let openingBalance = openingBalanceForGivenMonthsAndYears;
-        
+      const pastBalanceTillRequestYear = calculatePastBalanceTillRequestYear(
+        filterEventsByCustIdActivityAndMarket,
+        year,
+        requestYearEventMonthValuePairs
+      );
+      console.log(
+        "Closing balance for past years:",
+        pastBalanceTillRequestYear
+      );
 
-        // Calculate closing balance
-        let closingBalance = 0;
+      console.log("Request year events:", requestYearEventMonthValuePairs);
 
-        filteredEvents.forEach((event) => {
-          openingBalance +=
-            event.type === "INCREASED" ? event.value : -event.value;
-          closingBalance +=
-            event.type === "INCREASED" ? event.value : -event.value;
-        });
+      const monthlyClosingBalances = initializeMonthArray();
+      const monthlyOpeningBalances = initializeMonthArray();
+      monthlyOpeningBalances[0] = pastBalanceTillRequestYear;
 
-        // Log opening and closing balances
-        console.log("Opening balance:", openingBalance);
-        console.log("Closing balance:", closingBalance);
-
-        // console.log(filteredEvents);
-      } catch (error) {
-        console.error("Error parsing JSON:", error);
+      for (let month = 0; month < 12; month++) {
+        let monthValue = requestYearEventMonthValuePairs[month];
+        if (monthValue === 0 || monthValue == undefined) {
+          monthlyClosingBalances[month] = monthlyOpeningBalances[month];
+        } else {
+            let currentMonthNetValue = monthlyOpeningBalances[month];
+            currentMonthNetValue += monthValue;
+            monthlyClosingBalances[month] = currentMonthNetValue;
+        }
+        monthlyOpeningBalances[month + 1] = monthlyClosingBalances[month];
       }
     });
-
-    res.status(200).send(filteredEvents);
+    res.status(200).send('success');
   } catch (error) {
     res.status(400).send(error.message);
   }
 };
 
-function calculateOpeningBalanceForGivenMonthsAndYears(
-  balanceEvents,
-  startMonth,
-  currentYear
+function calculatePastBalanceTillRequestYear(
+  customerBalanceEvents,
+  requestYear,
+  requestYearEventMonthValuePairs
 ) {
-  let openingBalance = 0;
+  let pastBalanceTillRequestYear = 0;
 
-  balanceEvents.forEach((event) => {
+  customerBalanceEvents.forEach((event) => {
     const eventDate = new Date(event.time);
     const eventYear = eventDate.getFullYear();
-    const eventMonth = eventDate.getMonth() + 1; // Month is zero-based, so add 1
-
-    // Check if event occurred in a past month and year
-    if (
-      eventYear < parseInt(currentYear) ||
-      (eventYear === parseInt(currentYear) && eventMonth < startMonth)
-    ) {
-      console.log(eventMonth, "-", eventYear, event.value);
-      openingBalance += event.type === "INCREASED" ? event.value : -event.value;
+    const eventMonth = eventDate.getMonth();
+    // Check if event occurred in past years or request year
+    if (eventYear < parseInt(requestYear)) {
+      console.log(eventYear, "-", event.value);
+      pastBalanceTillRequestYear +=
+        event.type === "INCREASED" ? event.value : -event.value;
+    } else if (eventYear === parseInt(requestYear)) {
+      requestYearEventMonthValuePairs[eventMonth] +=
+        event.type === "INCREASED" ? event.value : -event.value;
     }
   });
 
-  return openingBalance;
+  return pastBalanceTillRequestYear;
+}
+
+function initializeMonthArray() {
+    const monthlyArray = [];
+  for (let month = 0; month < 12; month++) {
+    monthlyArray[month] = 0;
+  }
+  return monthlyArray;
 }
