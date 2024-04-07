@@ -5,6 +5,11 @@ import path from "path";
 const filePath = new URL("C:/hpp/my-ikea-test/task-a.sample.json").pathname;
 console.log(filePath);
 
+const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
 export const createCustomerBalance = async (req, res) => {
   try {
     const { retailUnitCode, customerId } = req.params;
@@ -33,6 +38,7 @@ export const getCustomerBalance = async (req, res) => {
     const startMonth = 11;
     const endMonth = 12;
     const { retailUnitCode, customerId, activity, year } = req.params;
+    let monthlybalance = {};
     fs.readFile(filePath, "utf8", (err, data) => {
       if (err) {
         console.error("Error reading file:", err);
@@ -52,7 +58,7 @@ export const getCustomerBalance = async (req, res) => {
           );
         }
       );
-    
+
       const requestYearEventMonthValuePairs = initializeMonthArray();
 
       const pastBalanceTillRequestYear = calculatePastBalanceTillRequestYear(
@@ -76,14 +82,19 @@ export const getCustomerBalance = async (req, res) => {
         if (monthValue === 0 || monthValue == undefined) {
           monthlyClosingBalances[month] = monthlyOpeningBalances[month];
         } else {
-            let currentMonthNetValue = monthlyOpeningBalances[month];
-            currentMonthNetValue += monthValue;
-            monthlyClosingBalances[month] = currentMonthNetValue;
+          let currentMonthNetValue = monthlyOpeningBalances[month];
+          currentMonthNetValue += monthValue;
+          monthlyClosingBalances[month] = currentMonthNetValue;
         }
-        monthlyOpeningBalances[month + 1] = monthlyClosingBalances[month];
+        
+        if(month != 11) 
+            monthlyOpeningBalances[month + 1] = monthlyClosingBalances[month];
       }
+      monthlybalance ={monthlyOpeningBalances,monthlyClosingBalances}
+      printBalanceValues(monthlyOpeningBalances, monthlyClosingBalances, year);
     });
-    res.status(200).send('success');
+    
+    res.status(200).send("success");
   } catch (error) {
     res.status(400).send(error.message);
   }
@@ -115,9 +126,16 @@ function calculatePastBalanceTillRequestYear(
 }
 
 function initializeMonthArray() {
-    const monthlyArray = [];
+  const monthlyArray = [];
   for (let month = 0; month < 12; month++) {
     monthlyArray[month] = 0;
   }
   return monthlyArray;
+}
+
+function printBalanceValues(monthlyOpeninggBalances, monthlyClosingBalances, requestYear) {
+    monthlyOpeninggBalances.forEach((entry, index) => {
+    console.log("Opening balance for month:", months[index], requestYear, "is: ", entry);
+    console.log("Closing balance for month:", months[index], requestYear, "is: ", monthlyClosingBalances[index]);
+  });
 }
