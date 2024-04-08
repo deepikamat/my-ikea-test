@@ -15,3 +15,9 @@ This repository holds the API for various customer activities such as Customer b
 project is deployed through App Engine on GCP server.
 - Use gcloud app deploy to deploy into server
 ```
+## Improvements
+
+Added some improvements later on 
+- Added relative path for json file.
+- modularize the code into small functions.
+-Pending unit test cases.
