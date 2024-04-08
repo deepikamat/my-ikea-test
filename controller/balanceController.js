@@ -1,9 +1,16 @@
 import Balance from "../model/balanceModel.js";
 import fs from "fs";
 import { initializeMonthArray } from "./util.js";
+import path from "path";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const filePath = new URL("C:/hpp/my-ikea-test/task-a.sample.json").pathname;
-console.log(filePath);
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Construct the relative path to the JSON file
+const relativeFilePath = path.join(__dirname, "../task-a.sample.json");
+
+console.log(__dirname, relativeFilePath);
 
 const months = [
   "January",
@@ -45,9 +52,8 @@ export const createCustomerBalance = async (req, res) => {
 
 export const getCustomerBalance = async (req, res) => {
   try {
-   
     const { retailUnitCode, customerId, activity, year } = req.params;
-    fs.readFile(filePath, "utf8", async (err, data) => {
+    fs.readFile(relativeFilePath, "utf8", async (err, data) => {
       if (err) {
         console.error("Error reading file:", err);
         return;
@@ -85,8 +91,6 @@ export const getCustomerBalance = async (req, res) => {
       printBalanceValues(monthlyOpeningBalances, monthlyClosingBalances, year);
       res.status(200).json({ monthlyOpeningBalances, monthlyClosingBalances });
     });
-
-    
   } catch (error) {
     res.status(400).send(error.message);
   }
