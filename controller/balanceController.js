@@ -1,14 +1,24 @@
 import Balance from "../model/balanceModel.js";
 import fs from "fs";
-import path from "path";
+import { initializeMonthArray } from "./util.js";
 
 const filePath = new URL("C:/hpp/my-ikea-test/task-a.sample.json").pathname;
 console.log(filePath);
 
 const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 export const createCustomerBalance = async (req, res) => {
   try {
@@ -35,19 +45,16 @@ export const createCustomerBalance = async (req, res) => {
 
 export const getCustomerBalance = async (req, res) => {
   try {
-    const startMonth = 11;
-    const endMonth = 12;
+   
     const { retailUnitCode, customerId, activity, year } = req.params;
-    let monthlybalance = {};
-    fs.readFile(filePath, "utf8", (err, data) => {
+    fs.readFile(filePath, "utf8", async (err, data) => {
       if (err) {
         console.error("Error reading file:", err);
         return;
       }
 
-      // -----------------------Calculate monthly closing and opening balance------------------------
+      //Filter events based on customerId, market and reason of Event
 
-      //To do --Improvement
       const allBalanceEvents = JSON.parse(data);
       const filterEventsByCustIdActivityAndMarket = allBalanceEvents.filter(
         (event) => {
@@ -59,52 +66,37 @@ export const getCustomerBalance = async (req, res) => {
         }
       );
 
-      const requestYearEventMonthValuePairs = initializeMonthArray();
+      const requestYearEventMonthValuePairs = initializeMonthArray(); // Initialize empty array for 12 months
 
+      //Calculate past year balance which will be opening balance for current year
       const pastBalanceTillRequestYear = calculatePastBalanceTillRequestYear(
         filterEventsByCustIdActivityAndMarket,
         year,
         requestYearEventMonthValuePairs
       );
-      console.log(
-        "Closing balance for past years:",
-        pastBalanceTillRequestYear
-      );
 
-      console.log("Request year events:", requestYearEventMonthValuePairs);
+      //Calculate monthly closing and opening balance for the requested year
+      const { monthlyOpeningBalances, monthlyClosingBalances } =
+        await calculateBalanceForRequestYear(
+          pastBalanceTillRequestYear,
+          requestYearEventMonthValuePairs
+        );
 
-      const monthlyClosingBalances = initializeMonthArray();
-      const monthlyOpeningBalances = initializeMonthArray();
-      monthlyOpeningBalances[0] = pastBalanceTillRequestYear;
-
-      for (let month = 0; month < 12; month++) {
-        let monthValue = requestYearEventMonthValuePairs[month];
-        if (monthValue === 0 || monthValue == undefined) {
-          monthlyClosingBalances[month] = monthlyOpeningBalances[month];
-        } else {
-          let currentMonthNetValue = monthlyOpeningBalances[month];
-          currentMonthNetValue += monthValue;
-          monthlyClosingBalances[month] = currentMonthNetValue;
-        }
-        
-        if(month != 11) 
-            monthlyOpeningBalances[month + 1] = monthlyClosingBalances[month];
-      }
-      monthlybalance ={monthlyOpeningBalances,monthlyClosingBalances}
       printBalanceValues(monthlyOpeningBalances, monthlyClosingBalances, year);
+      res.status(200).json({ monthlyOpeningBalances, monthlyClosingBalances });
     });
+
     
-    res.status(200).send("success");
   } catch (error) {
     res.status(400).send(error.message);
   }
 };
 
-function calculatePastBalanceTillRequestYear(
+const calculatePastBalanceTillRequestYear = (
   customerBalanceEvents,
   requestYear,
   requestYearEventMonthValuePairs
-) {
+) => {
   let pastBalanceTillRequestYear = 0;
 
   customerBalanceEvents.forEach((event) => {
@@ -123,19 +115,52 @@ function calculatePastBalanceTillRequestYear(
   });
 
   return pastBalanceTillRequestYear;
-}
+};
 
-function initializeMonthArray() {
-  const monthlyArray = [];
-  for (let month = 0; month < 12; month++) {
-    monthlyArray[month] = 0;
-  }
-  return monthlyArray;
-}
+const calculateBalanceForRequestYear = async (
+  pastBalanceTillRequestYear,
+  requestYearEventMonthValuePairs
+) => {
+  const monthlyClosingBalances = initializeMonthArray();
+  const monthlyOpeningBalances = initializeMonthArray();
+  monthlyOpeningBalances[0] = pastBalanceTillRequestYear;
 
-function printBalanceValues(monthlyOpeninggBalances, monthlyClosingBalances, requestYear) {
-    monthlyOpeninggBalances.forEach((entry, index) => {
-    console.log("Opening balance for month:", months[index], requestYear, "is: ", entry);
-    console.log("Closing balance for month:", months[index], requestYear, "is: ", monthlyClosingBalances[index]);
+  [...Array(12)].forEach((_, month) => {
+    let monthValue = requestYearEventMonthValuePairs[month];
+    if (monthValue === 0 || monthValue == undefined) {
+      monthlyClosingBalances[month] = monthlyOpeningBalances[month];
+    } else {
+      let currentMonthNetValue = monthlyOpeningBalances[month];
+      currentMonthNetValue += monthValue;
+      monthlyClosingBalances[month] = currentMonthNetValue;
+    }
+
+    if (month != 11)
+      monthlyOpeningBalances[month + 1] = monthlyClosingBalances[month];
   });
-}
+
+  return { monthlyOpeningBalances, monthlyClosingBalances };
+};
+
+const printBalanceValues = (
+  monthlyOpeninggBalances,
+  monthlyClosingBalances,
+  requestYear
+) => {
+  monthlyOpeninggBalances.forEach((entry, index) => {
+    console.log(
+      "Opening balance for month:",
+      months[index],
+      requestYear,
+      "is: ",
+      entry
+    );
+    console.log(
+      "Closing balance for month:",
+      months[index],
+      requestYear,
+      "is: ",
+      monthlyClosingBalances[index]
+    );
+  });
+};

@@ -13,5 +13,5 @@ This repository holds the API for various customer activities such as Customer b
 ## Deployment
 ```
 project is deployed through App Engine on GCP server.
-Use gcloud app deploy to deploy into server
+- Use gcloud app deploy to deploy into server
 ```
