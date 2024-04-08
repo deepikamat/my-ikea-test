@@ -6,8 +6,9 @@ This repository holds the API for various customer activities such as Customer b
 ## Run Locally
 -  Install dependencies
 -  cd my-ikea-test
-  npm install
- npm start
+-  npm install
+- npm start
+ 
 ### Run at server
  https://my-ikea-test-419409.ey.r.appspot.com/api
 
